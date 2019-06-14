@@ -1469,6 +1469,10 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 	unsigned long nr_skipped[MAX_NR_ZONES] = { 0, };
 	unsigned long scan, nr_pages;
 	LIST_HEAD(pages_skipped);
+#ifdef CONFIG_AMLOGIC_MODIFY
+	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+	int migrate_type = 0;
+#endif /* CONFIG_AMLOGIC_MODIFY */
 
 	for (scan = 0; scan < nr_to_scan && nr_taken < nr_to_scan &&
 					!list_empty(src);) {
@@ -1497,6 +1501,14 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 			nr_taken += nr_pages;
 			nr_zone_taken[page_zonenum(page)] += nr_pages;
 			list_move(&page->lru, dst);
+		#ifdef CONFIG_AMLOGIC_MODIFY
+			migrate_type = get_pageblock_migratetype(page);
+			if (is_migrate_cma(migrate_type) ||
+			    is_migrate_isolate(migrate_type))
+				__mod_zone_page_state(page_zone(page),
+					NR_LRU_BASE + lru + num,
+					-nr_pages);
+		#endif /* CONFIG_AMLOGIC_MODIFY */
 			break;
 
 		case -EBUSY:
@@ -1604,7 +1616,11 @@ int isolate_lru_page(struct page *page)
 static int too_many_isolated(struct pglist_data *pgdat, int file,
 		struct scan_control *sc)
 {
+#ifdef CONFIG_AMLOGIC_CMA
+	signed long inactive, isolated;
+#else
 	unsigned long inactive, isolated;
+#endif /* CONFIG_AMLOGIC_CMA */
 
 	if (current_is_kswapd())
 		return 0;
@@ -1620,14 +1636,24 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
 		isolated = node_page_state(pgdat, NR_ISOLATED_ANON);
 	}
 
+#ifdef CONFIG_AMLOGIC_CMA
+	isolated -= node_page_state(pgdat, NR_CMA_ISOLATED);
+#endif /* CONFIG_AMLOGIC_CMA */
 	/*
 	 * GFP_NOIO/GFP_NOFS callers are allowed to isolate more pages, so they
 	 * won't get blocked by normal direct-reclaimers, forming a circular
 	 * deadlock.
 	 */
+#ifndef CONFIG_AMLOGIC_MODIFY
 	if ((sc->gfp_mask & (__GFP_IO | __GFP_FS)) == (__GFP_IO | __GFP_FS))
 		inactive >>= 3;
-
+#endif
+#ifdef CONFIG_AMLOGIC_CMA
+	WARN_ONCE(isolated > inactive,
+		  "isolated:%ld, cma:%ld, inactive:%ld, mask:%x, file:%d\n",
+		  isolated, node_page_state(pgdat, NR_CMA_ISOLATED),
+		  inactive, sc->gfp_mask, file);
+#endif /* CONFIG_AMLOGIC_CMA */
 	return isolated > inactive;
 }
 
@@ -1896,6 +1922,10 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
 	unsigned long pgmoved = 0;
 	struct page *page;
 	int nr_pages;
+#ifdef CONFIG_AMLOGIC_MODIFY
+	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+	int migrate_type = 0;
+#endif /* CONFIG_AMLOGIC_MODIFY */
 
 	while (!list_empty(list)) {
 		page = lru_to_page(list);
@@ -1908,6 +1938,14 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
 		update_lru_size(lruvec, lru, page_zonenum(page), nr_pages);
 		list_move(&page->lru, &lruvec->lists[lru]);
 		pgmoved += nr_pages;
+	#ifdef CONFIG_AMLOGIC_MODIFY
+		migrate_type = get_pageblock_migratetype(page);
+		if (is_migrate_cma(migrate_type) ||
+		    is_migrate_isolate(migrate_type))
+			__mod_zone_page_state(page_zone(page),
+					      NR_LRU_BASE + lru + num,
+					      nr_pages);
+	#endif /* CONFIG_AMLOGIC_MODIFY */
 
 		if (put_page_testzero(page)) {
 			__ClearPageLRU(page);
@@ -2076,6 +2114,10 @@ static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 	gb = (inactive + active) >> (30 - PAGE_SHIFT);
 	if (gb)
 		inactive_ratio = int_sqrt(10 * gb);
+#ifdef CONFIG_AMLOGIC_MEMORY_EXTEND
+	else if (!file && (totalram_pages >> (20 - PAGE_SHIFT)) >= 512)
+		inactive_ratio = 2;
+#endif /* CONFIG_AMLOGIC_MEMORY_EXTEND */
 	else
 		inactive_ratio = 1;
 
@@ -2230,6 +2272,10 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * This scanning priority is essentially the inverse of IO cost.
 	 */
 	anon_prio = swappiness;
+#ifdef CONFIG_AMLOGIC_MEMORY_EXTEND
+	if (get_nr_swap_pages() * 3 < total_swap_pages)
+		anon_prio >>= 1;
+#endif /* CONFIG_AMLOGIC_MEMORY_EXTEND */
 	file_prio = 200 - anon_prio;
 
 	/*
@@ -3474,6 +3520,9 @@ static int kswapd(void *p)
 
 	pgdat->kswapd_order = alloc_order = reclaim_order = 0;
 	pgdat->kswapd_classzone_idx = classzone_idx = 0;
+#ifdef CONFIG_AMLOGIC_CMA
+	set_user_nice(current, -5);
+#endif /* CONFIG_AMLOGIC_CMA */
 	for ( ; ; ) {
 		bool ret;
 

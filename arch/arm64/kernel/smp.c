@@ -55,8 +55,15 @@
 #include <asm/ptrace.h>
 #include <asm/virt.h>
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <asm/perf_event.h>
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
+
+DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
+EXPORT_PER_CPU_SYMBOL(cpu_number);
 
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
@@ -73,7 +80,12 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_TIMER,
 	IPI_IRQ_WORK,
+#ifdef CONFIG_AMLOGIC_MODIFY
+	IPI_WAKEUP,
+	IPI_AML_PMU
+#else
 	IPI_WAKEUP
+#endif
 };
 
 #ifdef CONFIG_ARM64_VHE
@@ -146,6 +158,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 	 * We need to tell the secondary core where to find its stack and the
 	 * page tables.
 	 */
+	secondary_data.task = idle;
 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
 	update_cpu_boot_status(CPU_MMU_OFF);
 	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
@@ -170,6 +183,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
 	}
 
+	secondary_data.task = NULL;
 	secondary_data.stack = NULL;
 	status = READ_ONCE(secondary_data.status);
 	if (ret && status) {
@@ -208,7 +222,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 asmlinkage void secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
-	unsigned int cpu = smp_processor_id();
+	unsigned int cpu;
+
+	cpu = task_cpu(current);
+	set_my_cpu_offset(per_cpu_offset(cpu));
 
 	/*
 	 * All kernel threads share the same mm context; grab a
@@ -216,8 +233,6 @@ asmlinkage void secondary_start_kernel(void)
 	 */
 	atomic_inc(&mm->mm_count);
 	current->active_mm = mm;
-
-	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
 
 	/*
 	 * TTBR0 is only used for the identity mapping at this stage. Make it
@@ -718,6 +733,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 */
 	for_each_possible_cpu(cpu) {
 
+		per_cpu(cpu_number, cpu) = cpu;
+
 		if (cpu == smp_processor_id())
 			continue;
 
@@ -748,6 +765,9 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
 	S(IPI_TIMER, "Timer broadcast interrupts"),
 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
 	S(IPI_WAKEUP, "CPU wake-up interrupts"),
+#ifdef CONFIG_AMLOGIC_MODIFY
+	S(IPI_AML_PMU, "AML pmu cross interrupts"),
+#endif
 };
 
 static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
@@ -755,6 +775,13 @@ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
 	trace_ipi_raise(target, ipi_types[ipinr]);
 	__smp_cross_call(target, ipinr);
 }
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+void smp_send_aml_pmu(int cpu)
+{
+	smp_cross_call(cpumask_of(cpu), IPI_AML_PMU);
+}
+#endif
 
 void show_ipi_list(struct seq_file *p, int prec)
 {
@@ -819,6 +846,7 @@ static void ipi_cpu_stop(unsigned int cpu)
 		cpu_relax();
 }
 
+
 /*
  * Main handler for inter-processor interrupts
  */
@@ -870,6 +898,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		WARN_ONCE(!acpi_parking_protocol_valid(cpu),
 			  "CPU%u: Wake-up IPI outside the ACPI parking protocol\n",
 			  cpu);
+		break;
+#endif
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+	case IPI_AML_PMU:
+		armv8pmu_handle_irq_ipi();
 		break;
 #endif
 

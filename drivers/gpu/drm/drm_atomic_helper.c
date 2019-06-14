@@ -2421,7 +2421,7 @@ int __drm_atomic_helper_set_config(struct drm_mode_set *set,
 	primary_state->crtc_h = vdisplay;
 	primary_state->src_x = set->x << 16;
 	primary_state->src_y = set->y << 16;
-	if (primary_state->rotation & (DRM_ROTATE_90 | DRM_ROTATE_270)) {
+	if (drm_rotation_90_or_270(primary_state->rotation)) {
 		primary_state->src_w = vdisplay << 16;
 		primary_state->src_h = hdisplay << 16;
 	} else {
@@ -3166,6 +3166,9 @@ void __drm_atomic_helper_plane_destroy_state(struct drm_plane_state *state)
 {
 	if (state->fb)
 		drm_framebuffer_unreference(state->fb);
+
+	if (state->fence)
+		fence_put(state->fence);
 }
 EXPORT_SYMBOL(__drm_atomic_helper_plane_destroy_state);
 
