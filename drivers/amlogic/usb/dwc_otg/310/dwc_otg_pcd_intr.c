@@ -2171,6 +2171,12 @@ static void complete_ep(dwc_otg_pcd_ep_t *ep)
 	int is_last = 0;
 	int i;
 
+    /*
+     * Fix for compiler warning ('deptsiz.b.pktcnt' may be used
+     * uninitialized).
+     */
+	deptsiz.b.pktcnt = 0;
+
 	DWC_DEBUGPL(DBG_PCDV, "%s() %d-%s\n", __func__, ep->dwc_ep.num,
 		    (ep->dwc_ep.is_in ? "IN" : "OUT"));
 

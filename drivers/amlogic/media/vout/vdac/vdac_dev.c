@@ -174,9 +174,9 @@ void ana_ref_cntl0_bit9(bool on, unsigned int module_sel)
 		vdac_hiu_reg_setb(HHI_VDAC_CNTL0, enable, 9, 1);
 	else if (is_meson_g12a_cpu() ||
 			is_meson_g12b_cpu())
-		vdac_hiu_reg_setb(HHI_VDAC_CNTL0_G12A, ~enable, 9, 1);
+		vdac_hiu_reg_setb(HHI_VDAC_CNTL0_G12A, !enable, 9, 1);
 	else
-		vdac_hiu_reg_setb(HHI_VDAC_CNTL0, ~enable, 9, 1);
+		vdac_hiu_reg_setb(HHI_VDAC_CNTL0, !enable, 9, 1);
 }
 EXPORT_SYMBOL(ana_ref_cntl0_bit9);
 
@@ -327,7 +327,7 @@ void vdac_out_cntl1_bit3(bool on, unsigned int module_sel)
 	if (is_meson_txl_cpu() || is_meson_txlx_cpu())
 		vdac_hiu_reg_setb(HHI_VDAC_CNTL1, enable, 3, 1);
 	else
-		vdac_hiu_reg_setb(HHI_VDAC_CNTL1, ~enable, 3, 1);
+		vdac_hiu_reg_setb(HHI_VDAC_CNTL1, !enable, 3, 1);
 }
 EXPORT_SYMBOL(vdac_out_cntl1_bit3);
 
