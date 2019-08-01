@@ -1,0 +1,43 @@
+DOCKER CONTAINER SETUP
+----------------------
+
+# Ubuntu bionic or newer.
+
+# dpkg --add-architecture i386
+# apt update
+# apt install -y build-essential file wget cpio python unzip rsync bc \
+                 automake gcc-aarch64-linux-gnu libncurses-dev flex bison \
+                 libssl-dev libstdc++6:i386 u-boot-tools
+
+meson64_gxl_defconfig
+---------------------
+
+Buildroot's default configuration but with:
+ - ANDROID_PARANOID_NETWORK=n
+ - CONFIG_FRAMEBUFFER_CONSOLE=m
+
+mkbootimg
+---------
+
+Android utility to create a boot.img.
+
+initrd.img-4.9.113
+------------------
+
+Kernel ramdisk.
+
+BUILD
+-----
+
+# . setenv.sh
+# . build.sh
+
+Only allow certain groups to create sockets (ANDROID_PARANOID_NETWORK) [Y/n/?] (NEW) n
+Map the console to the primary display device (FRAMEBUFFER_CONSOLE_DETECT_PRIMARY) [N/y/?] (NEW) y
+Framebuffer Console Rotation (FRAMEBUFFER_CONSOLE_ROTATION) [N/y/?] (NEW) n
+Select compiled-in fonts (FONTS) [N/y/?] (NEW) n
+
+PACKAGE
+-------
+
+# . install.sh
