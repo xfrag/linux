@@ -1,0 +1,20 @@
+Put these files under /etc/display/ and create a service to start them.
+
+vi /etc/systemd/system/display.service
+
+--
+
+[Unit] 
+Description=Display Init 
+After=getty.target 
+ 
+[Service] 
+Type=simple 
+Restart=always 
+ExecStart=/etc/display/initialize_display.sh
+ 
+[Install] 
+WantedBy=multi-user.target 
+
+--
+

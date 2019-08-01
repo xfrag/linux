@@ -1,0 +1,12 @@
+[Unit]
+Description=Display
+After=getty.target
+
+[Service]
+Type=simple
+Restart=no
+#ExecStart=/etc/display/display_init
+ExecStart=/etc/display/initialize_display.sh
+
+[Install]
+WantedBy=multi-user.target

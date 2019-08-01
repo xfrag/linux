@@ -1,0 +1,24 @@
+ARM Mali-300/400/450 GPU (Utgard)
+---------------------------------
+
+BUILD
+-----
+
+Make sure you have built the Kernel first (having ran the Kernel's setenv.sh and build.sh)
+setenv.sh exposes necessary environment variables for this module's build script.
+
+Having our kernel ready we can just run build.sh. This script will also copy the mali.ko
+file to the kernel's modules output.
+
+PACKAGE
+-------
+
+Since mali.ko is now with the other kernel modules we can use the kernel's install.sh
+script.
+
+INSTALL
+-------
+
+# insmod /lib/modules/4.9.113/kernel/drivers/mali.ko
+
+(Instead of using insmod it is possible that a reboot will suffice).
